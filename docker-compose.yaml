@@ -1,0 +1,44 @@
+version: '3.8' # Specify the Docker Compose file format version
+
+services:
+  # Service for the PostgreSQL database
+  db:
+    image: postgres:15-alpine # Use a lightweight PostgreSQL image
+    container_name: financial_db_container
+    environment:
+      POSTGRES_DB: financial_db # Database name
+      POSTGRES_USER: postgres   # Database user
+      POSTGRES_PASSWORD: 12345678 # !!! IMPORTANT: Replace with a strong password (matching application.properties) !!!
+    ports:
+      - "5432:5432" # Map host port 5432 to container port 5432
+    volumes:
+      - db_data:/var/lib/postgresql/data # Persist data to a named volume
+    healthcheck: # Health check to ensure DB is ready before app starts
+      test: ["CMD-SHELL", "pg_isready -U postgres -d financial_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Service for the Spring Boot application
+  app:
+    build:
+      context: . # Build context is the current directory (where Dockerfile is)
+      dockerfile: Dockerfile
+    container_name: transaction_management_app
+    ports:
+      - "8080:8080" # Map host port 8080 to container port 8080
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/financial_db # Connect to 'db' service
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: 12345678 # !!! IMPORTANT: Must match DB password !!!
+      JWT_SECRET_KEY: yourVeryLongAndSecureSecretKeyForJWTGenerationThatIsAtLeast256BitsLong # Must match application.properties
+      JWT_EXPIRATION_MS: 3600000
+      JWT_REFRESH_EXPIRATION_MS: 604800000
+    depends_on:
+      db: # Ensure db service is healthy before starting app
+        condition: service_healthy
+    restart: on-failure # Restart if the container exits with an error
+
+volumes:
+  db_data: # Define the named volume for database persistence
+
